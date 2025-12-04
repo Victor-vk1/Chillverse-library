@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Library — Elements SPA</title>
+<style>
+  :root{
+    --accent: #00e6a8;
+    --glass: rgba(255,255,255,0.06);
+    --neonWhite: rgba(255,255,255,0.98);
+    --text: #eef7f6;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;font-family:Inter,system-ui,-apple-system,"Helvetica Neue",Arial;background:#000;color:var(--text);overflow:hidden}
+
+/* BACKGROUND CLOUDS (depth) */
+.bg {
+  position:fixed; inset:0; z-index:-60; pointer-events:none;
+  background: radial-gradient(circle at 10% 10%, rgba(30,30,40,0.06), transparent 12%),
+              radial-gradient(circle at 90% 80%, rgba(20,12,40,0.06), transparent 18%);
+}
+
+/* CLOUD LAYERS */
+.clouds { position:fixed; inset:0; z-index:-50; pointer-events:none; }
+.cloud {
+  position:absolute; left:-24%; width:140%; border-radius:50%;
+  background-image: radial-gradient(circle at 20% 30%, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.9) 8%, rgba(255,255,255,0.78) 14%, rgba(255,255,255,0.55) 26%, rgba(255,255,255,0.18) 40%, transparent 60%);
+  filter: blur(12px) saturate(.95) contrast(.98);
+}
+.cloud.layer1{ top:6%; height:22%; opacity:0.46; animation:cloudA 72s linear infinite; }
+.cloud.layer2{ top:30%; height:28%; opacity:0.36; filter: blur(14px); animation:cloudB 96s linear infinite reverse; }
+.cloud.layer3{ top:60%; height:36%; opacity:0.28; filter: blur(20px); animation:cloudC 110s linear infinite; }
+@keyframes cloudA{ from{transform:translateY(0) translateX(0)} to{transform:translateY(-46px) translateX(-36%)} }
+@keyframes cloudB{ from{transform:translateY(0) translateX(0)} to{transform:translateY(-68px) translateX(-44%)} }
+@keyframes cloudC{ from{transform:translateY(0) translateX(0)} to{transform:translateY(-100px) translateX(-52%)} }
+
+/* NEON LIBRARY (session-only) */
+.neon {
+  position: fixed;
+  top: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  font-weight: 900;
+  font-size: 40px;
+  color: var(--neonWhite);
+  letter-spacing: 6px;
+  text-shadow: 0 0 10px rgba(255,255,255,0.9), 0 0 22px rgba(255,255,255,0.45);
+  animation: neonFloat 5s ease-in-out infinite;
+  cursor: pointer;
+}
+@keyframes neonFloat{ 0%{ transform:translateX(-50%) translateY(0) } 50%{ transform:translateX(-50%) translateY(-10px) } 100%{ transform:translateX(-50%) translateY(0) } }
+
+/* NEON BUBBLES (up/down only) - shared between pages */
+.bubble {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(6px);
+  opacity: 0.72;
+  animation: bubbleY 6s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 5;
+}
+@keyframes bubbleY {
+  0% { transform: translateY(0); opacity:0.6; }
+  50% { transform: translateY(-28px); opacity:0.9; }
+  100% { transform: translateY(0); opacity:0.6; }
+}
+
+/* APP SHELL (center) */
+.app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* LOGIN CONTAINER (visible initially) */
+.view {
+  position: absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:20;
+  transition: opacity 540ms ease, filter 540ms ease, transform 540ms ease;
+}
+.view.hidden { opacity:0; pointer-events:none; filter: blur(6px) grayscale(.05); transform: scale(.995); }
+
+/* SLIM GLASS CARD (spring + tilt applied via JS) */
+.card {
+  width: 360px; max-width:92vw; padding:18px; border-radius:14px;
+  background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.10);
+  backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 26px 80px rgba(0,0,0,0.6), 0 6px 20px rgba(0,0,0,0.4);
+  transform-origin:center; will-change: transform;
+  position: relative;
+}
+.card h2{ margin:0 0 6px 0; text-align:center; font-size:16px; letter-spacing:0.4px }
+.card .note{ margin:0 0 12px 0; text-align:center; opacity:0.85; font-size:13px }
+
+/* inputs & button */
+.input { width:100%; padding:11px 12px; margin-top:10px; border-radius:10px; border:none; background: rgba(255,255,255,0.06); color:var(--text); font-size:14px; outline:none; }
+.btn { margin-top:12px; width:100%; padding:12px; border-radius:10px; border:none; font-weight:800; cursor:pointer; background: linear-gradient(180deg, var(--accent), #00b57f); color:#02110f; box-shadow: 0 8px 26px rgba(0,160,120,0.12); }
+
+/* post-login slim panel inside login view (revealed after login) */
+.post { display:none; margin-top:12px; }
+.display-slim { padding:10px; border-radius:10px; background: rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.04); font-size:13px; }
+.history-btn { margin-top:10px; padding:10px; width:100%; border-radius:10px; border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); color:var(--text); cursor:pointer; font-weight:700 }
+
+/* STORY VIEW (hidden initially) */
+.storyView {
+  position: absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:25;
+  opacity:0; pointer-events:none; transition: opacity 540ms ease, filter 540ms ease, transform 540ms ease;
+}
+.storyView.active { opacity:1; pointer-events:auto; }
+.storyPanel {
+  width:min(980px,96vw); max-height:86vh; overflow:auto; padding:20px; border-radius:14px;
+  background: linear-gradient(180deg, rgba(12,12,14,0.92), rgba(18,18,20,0.96));
+  border:1px solid rgba(255,255,255,0.06); box-shadow: 0 40px 120px rgba(0,0,0,0.7);
+  color:var(--text);
+  backdrop-filter: blur(10px) saturate(125%);
+}
+.storyHeader { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;}
+.closeBtn { padding:8px 10px; border-radius:8px; cursor:pointer; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); }
+
+/* responsive */
+@media (max-width:720px){
+  .card { width:92vw; padding:14px }
+  .neon { font-size:32px; top:6% }
+  .storyPanel { width:94vw; padding:14px }
+}
+</style>
+</head>
+<body>
+  <div class="bg" aria-hidden="true"></div>
+  <div class="clouds" aria-hidden="true">
+    <div class="cloud layer1"></div>
+    <div class="cloud layer2"></div>
+    <div class="cloud layer3"></div>
+  </div>
+
+  <!-- neon library (click to dismiss for session) -->
+  <div class="neon" id="neonLib" title="Click to dismiss">LIBRARY</div>
+
+  <!-- neon bubbles (blue/purple) - will be created by JS -->
+  <div id="bubbles"></div>
+
+  <div class="app">
+    <!-- LOGIN VIEW -->
+    <div class="view" id="loginView" role="dialog" aria-label="Login view">
+      <div class="card" id="loginCard">
+        <h2>Enter Access</h2>
+        <p class="note">Sign in to reveal the Frozen Archive of Elements.</p>
+
+        <input id="email" class="input" type="email" placeholder="Email" autocomplete="email" />
+        <input id="username" class="input" type="text" placeholder="Username" autocomplete="username" />
+        <input id="password" class="input" type="password" placeholder="Password" autocomplete="current-password" />
+
+        <button class="btn" id="loginBtn">Log in</button>
+
+        <div class="post" id="postArea" aria-live="polite">
+          <div class="display-slim" id="credsView"></div>
+          <button class="history-btn" id="openStoryBtn">History of Elements</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STORY VIEW -->
+    <div class="storyView" id="storyView" role="region" aria-label="Story view">
+      <div class="storyPanel" id="storyPanel">
+        <div class="storyHeader">
+          <h3 style="margin:0">History of the Five Elements</h3>
+          <div class="closeBtn" id="closeStory">Close</div>
+        </div>
+        <div id="storyContent" style="white-space:pre-wrap; line-height:1.6; font-size:15px;"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* --------------------------
+   Create neon bubbles (blue + purple)
+   Float up/down only (no sideways)
+   Bubbles appear behind the glass (z small)
+   -------------------------- */
+(function createBubbles(){
+  const count = 14;
+  const container = document.getElementById('bubbles');
+  for(let i=0;i<count;i++){
+    const b = document.createElement('div');
+    b.className = 'bubble';
+    const size = 18 + Math.random()*50;
+    const left = 4 + Math.random()*92; // vw
+    const top = 20 + Math.random()*60; // vh
+    const delay = Math.random()*4;
+    const duration = 5 + Math.random()*6;
+    b.style.width = size + 'px';
+    b.style.height = size + 'px';
+    b.style.left = left + 'vw';
+    b.style.top = top + 'vh';
+    b.style.animationDelay = delay + 's';
+    b.style.animationDuration = duration + 's';
+    const color = Math.random() > 0.5 ? 'rgba(0,150,255,0.8)' : 'rgba(140,40,255,0.8)';
+    b.style.boxShadow = `0 0 ${Math.max(20, size/2)}px ${color}, inset 0 0 ${Math.max(8, size/5)}px ${color}`;
+    container.appendChild(b);
+  }
+})();
+
+/* Neon dismiss */
+const neon = document.getElementById('neonLib');
+let neonDismissed = false;
+neon.addEventListener('click', ()=> { neon.style.display='none'; neonDismissed=true; });
+
+/* ---- SPRING + TILT PHYSICS for login card ----
+   Damped spring for translateY + pointer tilt for rotation
+   Idle small impulses keep it alive
+*/
+const loginCard = document.getElementById('loginCard');
+let state = { y:0, v:0, target:0, k:0.038, c:0.86, mass:1 };
+let tilt = { x:0, y:0, targetX:0, targetY:0 };
+let lastImpulse = performance.now();
+
+function maybeImpulse(now){
+  if(now - lastImpulse > 2500 + Math.random()*3500){
+    state.v += (-8 + Math.random()*16);
+    lastImpulse = now;
+  }
+}
+
+let last = performance.now();
+function tick(now){
+  const dt = Math.min(32, now-last)/1000; last = now;
+  maybeImpulse(now);
+  const a = (-state.k * (state.y - state.target) - state.c * state.v) / state.mass;
+  state.v += a * dt * 60;
+  state.y += state.v * dt * 60;
+
+  tilt.x += (tilt.targetX - tilt.x) * 0.12;
+  tilt.y += (tilt.targetY - tilt.y) * 0.12;
+
+  const rotX = clamp(mapRange(state.y, -28, 28, 6, -6), -8, 8) + (tilt.y * 0.18);
+  const rotY = (tilt.x * 0.18);
+
+  loginCard.style.transform = `translateZ(0) translateY(${state.y}px) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function mapRange(v,a,b,A,B){ return A + (v-a)*(B-A)/(b-a); }
+
+/* pointer tilt & small target offset for spring */
+document.addEventListener('mousemove', e => {
+  const cx = window.innerWidth/2, cy = window.innerHeight/2;
+  const dx = (e.clientX - cx)/cx, dy = (e.clientY - cy)/cy;
+  tilt.targetX = dx * 6; tilt.targetY = -dy * 6;
+  state.target = clamp(-dy*10, -22, 22);
+});
+document.addEventListener('mouseleave', ()=> { tilt.targetX = 0; tilt.targetY = 0; state.target = 0; });
+
+/* click impulse */
+document.addEventListener('pointerdown', e=>{
+  const r = loginCard.getBoundingClientRect();
+  if(e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom){
+    state.v += -10 + Math.random()*18;
+  }
+  spawnRipple(e.clientX, e.clientY, 0.06);
+});
+
+function spawnRipple(x,y,alpha=0.12){ const r=document.createElement('div'); r.className='ripple'; r.style.left=x+'px'; r.style.top=y+'px'; r.style.background=`rgba(255,255,255,${alpha})`; document.body.appendChild(r); setTimeout(()=>r.remove(),650); }
+(function addRippleCss(){ const s=document.createElement('style'); s.textContent = `.ripple{position:fixed;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;background:rgba(255,255,255,0.12);animation:rip 600ms forwards;z-index:80}@keyframes rip{from{width:0;height:0;opacity:0.6}to{width:360px;height:360px;opacity:0}}`; document.head.appendChild(s); })();
+
+/* ---- UI-only "login" flow (no network) ---- */
+const loginBtn = document.getElementById('loginBtn');
+const postArea = document.getElementById('postArea');
+const credsView = document.getElementById('credsView');
+const openStoryBtn = document.getElementById('openStoryBtn');
+
+loginBtn.addEventListener('click', ()=>{
+  const email = document.getElementById('email').value.trim();
+  const user = document.getElementById('username').value.trim();
+  const pass = document.getElementById('password').value;
+  if(!email || !user || !pass){ alert('Please fill Email, Username and Password (UI-only).'); return; }
+
+  credsView.innerHTML = `<div style="display:flex;justify-content:space-between"><div style="opacity:.8">Email</div><div>${escapeHtml(email)}</div></div>
+    <div style="display:flex;justify-content:space-between;margin-top:8px"><div style="opacity:.8">Username</div><div>${escapeHtml(user)}</div></div>
+    <div style="display:flex;justify-content:space-between;margin-top:8px"><div style="opacity:.8">Password</div><div>●●●●●●</div></div>`;
+
+  document.getElementById('email').style.display='none';
+  document.getElementById('username').style.display='none';
+  document.getElementById('password').style.display='none';
+  loginBtn.style.display='none';
+  postArea.style.display='block';
+  neon.style.display='none';
+
+  state.v += -18; // joyful impulse
+  sessionStorage.setItem('elements_session', JSON.stringify({ email, user }));
+
+  // Fade + blur transition to story view (but we show only History button now per your flow)
+  // (we keep the loginView visible but blurred — actual Story opens when user taps History)
+});
+
+/* hydrate session */
+(function hydrate(){
+  try{
+    const s = JSON.parse(sessionStorage.getItem('elements_session') || 'null');
+    if(s && s.email && s.user){
+      document.getElementById('email').style.display='none';
+      document.getElementById('username').style.display='none';
+      document.getElementById('password').style.display='none';
+      loginBtn.style.display='none';
+      postArea.style.display='block';
+      credsView.innerHTML = `<div style="display:flex;justify-content:space-between"><div style="opacity:.8">Email</div><div>${escapeHtml(s.email)}</div></div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px"><div style="opacity:.8">Username</div><div>${escapeHtml(s.user)}</div></div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px"><div style="opacity:.8">Password</div><div>●●●●●●</div></div>`;
+      neon.style.display='none';
+    }
+  }catch(e){}
+})();
+
+function escapeHtml(s){ return s.replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+/* ---- STORY transition: Fade + Blur (soft) ---- */
+const loginView = document.getElementById('loginView');
+const storyView = document.getElementById('storyView');
+const storyPanel = document.getElementById('storyPanel');
+const storyContent = document.getElementById('storyContent');
+const closeStory = document.getElementById('closeStory');
+
+openStoryBtn.addEventListener('click', ()=> {
+  // fade+blur login view
+  loginView.classList.add('hidden');
+  // small delay then show story view with fade
+  setTimeout(()=> {
+    storyView.classList.add('active');
+    // inject story text (full long story)
+    storyContent.textContent = storyText;
+    // gentle focus effect impulse
+    state.v += -10;
+  }, 220);
+});
+
+closeStory.addEventListener('click', ()=>{
+  storyView.classList.remove('active');
+  loginView.classList.remove('hidden');
+});
+
+/* also close story on ESC */
+document.addEventListener('keydown', e => { if(e.key === 'Escape'){ if(storyView.classList.contains('active')){ storyView.classList.remove('active'); loginView.classList.remove('hidden'); } } });
+
+/* ---------- Elemental story text (~2000 words) ---------- */
+const storyText = `The Elements Remember
+
+Long before maps were laid down and names were whispered in courts, the world lay raw and fractious — a place where the weather did not obey roads and the rocks hid their reasons. People lived beside these forces as if camped near wild beasts: respectful, watchful, and at times terrified. From the hiss of winter on the coasts to the sudden blaze that swallowed a hillside, the elements were first perceived as temperament — random, unpredictable, powerful. They were not yet 'things' to be understood; they were moods of the land.
+
+The change began in fragments: travelers who kept diaries, fishermen who recorded how the sea slept differently after certain months, potters who learned that certain clays sang under particular flames. A small band of observers gathered. They were not a single school, but a loose fellowship of keepers who sat with storms, with volcano breath, with cave silence. They sought to describe rather than conquer. Their first insight was simple and profound — when you name a thing, you can begin to coax it into patterns. When they began to write, the wild began to listen.
+
+Cryo first took shape as a way of seeing cold as work instead of punishment. The earliest Cryo keepers were not magicians but craftsmen: they watched how frost threaded itself into reeds, how ice could hold the shape of a bird’s wing in a single, patient instant. From the coast where winter water kept a glassy patience, a practice developed — not the freezing of everything but the use of cold to slow decay and to steal time back from entropy. Cryo was useful to preserve seed, blood, and memory. Its early practitioners learned to weave stillness like cloth, to create pockets where motion could be paused without death. In time Cryo developed gentle rituals: songs low enough to freeze a cup's rim, small brass tools shaped to coax crystalline patterns. In its best hands, Cryo became mercy: an ability to hold life in soft stasis for later revival.
+
+Pyro's story began where the hearth burned and where craft demanded change. Fire had always been the simple answer: scorch the earth, melt the metal, bend the blade. But the first Pyrowrights discovered that flame had character. Not all flames were equal; some burned with a hungry yellow, others with a thin blue that cut and sang. They learned to temper flame into purpose. Pyro's early history reads like a set of vows: burn to create, do not burn for spectacle. Pyro taught people how to remake, how to render the old into new forms. Ceramics that survived centuries, inks that resisted rain, kilns that sang at just the right pitch — these were the craft-gifts of Pyro. The danger was obvious: flame could liberate or erase. That knowledge birthed restraint as a discipline: the controlled hearth, the tempered ember, the vow to feed only what was necessary.
+
+Electro arrived as pattern, as the human eye learned to read the brushstrokes of lightning. Those who watched storms noticed that the flash followed the same shapes on certain ridges; metal veins sang under particular clouds. The first electro-scribes discovered how to store the storm in crude batteries, to coax charge into loops that could spin a mill or light a watchman’s lamp. Electro's wonder was immediacy — one strike, and the dark retreated. But its temper was capricious; misused, charge would singe and snap. Over generations, Electro's practice moved from spectacle to instrument: grids that carried light across a dark street, sensors that listened for shifts in the ground's electric whisper. Electro became a discipline of harnessing suddenness into utility: capture, store, release.
+
+Geo grew from patience. The oldest Geo teachers were miners and terrace-builders who listened to the low song of a valley. Geo's gifts were endurance and structure. Where Cryo could hold a moment and Pyro could remake matter, Geo held space for life to happen. Masters learned which cut held and which would shatter under frost, how to read strata like pages that told the history of rain and drought. The first Geo architects used this knowledge to make terraces that turned slopes into fields, to engineer foundations that would not sigh after a season. Geo’s art was geometry; its ethics were humility to the slow time of stone.
+
+Animo is the thread that stitches all others into living practice. Where Cryo preserves, Pyro remakes, Electro quickens, and Geo holds, Animo attends. Early Animo practices began as lullabies and work-songs, small protocols for groups to synchronize breathing, cadence, and attention. In field experiments it became clear that a group moving in shared rhythm would make tasks more efficient and violent upsets less likely. Animo's craft extended to medicine: small gestures and tones that eased fever, ritualized movements that steadied those with terror. Animo insisted that any engagement with a force must begin with consent and end with repair.
+
+As these ways matured, the keepers formed covenants. It was not enough to have powerful techniques; a civilization required rules. The First Concord was an agreement: Cryo would protect and preserve; Pyro would transform responsibly; Electro would be harnessed with safeguards; Geo would provide foundations; Animo would bind the social contract. Instruments were created — hearth-lenses that made fire sing evenly, insulated coils that shackled lightning, cryo-pillows that held perishable cargo safe. The Concord established roles: watchers, coders of practice, priests who taught restraint.
+
+Inevitably, the elements became tools of power as much as tools of care. Some used Pyro to raze rivals; others used Electro to terrorize the coast. Catalyzing that danger, the keepers learned an even tougher truth: technical skill without shared ethics tears systems apart. Repeated crises — scorched fields, molten floods, riots fed by uncontrolled storms — forced a public re-negotiation. The revised Concord was more civic: apprenticeships became public, instruments were kept in communal houses, and the arts joined with law. The elements moved from private monopoly into shared infrastructure.
+
+From there the elements settled into daily life. Cryo vaults stored medicines; Pyro workshops spun clay into ceramic worlds; Electro lines lit cities; Geo terraces fed populations; Animo centers taught rituals of care. Children learned basic element-crafts like different songs: a lullaby that encouraged seeds to split, a small Pyro breath that tempered a blade's edge, and a simple Animo clasp that steadied a worker's hands. The living archive — the Library — codified these in both verse and formula, preserving the balance between practicality and reverence.
+
+The modern telling of the elements is not a story of conquest but partnership. Cryo, Pyro, Electro, Geo, and Animo are less like weapons of myth and more like languages that people learned to speak. Each has beauty, and each has danger. Cryo’s beauty is the patient hush of a preserved thing. Pyro’s beauty is the art of transformation. Electro’s beauty is the sudden flare of insight. Geo’s beauty is the slow curve of infrastructure. Animo’s beauty is the breath that makes a community feel like a single organism.
+
+That is how the elements came about: human curiosity that named the wild, patient craft that made it usable, and a world-worn ethic that insisted the power be tempered by care. The rest — the spells, the guilds, the competitions — are footnotes to a larger truth: when people listen, strange forces can be woven into civilized life. And so the elements remember not through a book alone but through the small habits of people who still hum the old songs and tend the old embers.`;
+
+/* end of file */
+</script>
+</body>
+</html>
